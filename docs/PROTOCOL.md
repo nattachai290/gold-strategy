@@ -84,8 +84,9 @@ hurdle: G3 asks for a higher Sharpe than the best of these.
 
 ## Result analyzer
 
-After every run the planner runs `python -m goldml.analyze results/RNNN`
-(diagnostics on recorded files only) and writes `results/RNNN/analysis.md`.
+Every dev run writes `results/RNNN/analysis.md` automatically at the end
+(`python -m goldml.analyze results/RNNN` regenerates it from the recorded
+files; holdout runs get no analysis, so the holdout never feeds tuning).
 Per experiment it reports fold consistency (share of walk-forward blocks that
 beat buy & hold), decay (yearly excess vs buy & hold, first vs second half),
 train vs out-of-sample skill (AUC or rank IC per fold), cost drag, exposure,

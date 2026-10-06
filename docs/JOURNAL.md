@@ -16,6 +16,9 @@ Newest entry first. Each run: plan → result → what was learned → next step
   required before sealing a candidate (PROTOCOL).
 - Synthetic check: a deep LightGBM on a random walk gets OVERFIT (train AUC
   1.00, OOS 0.50); a logistic on a planted 5-day signal gets ACCEPT.
+- Each dev run now writes `analysis.md` itself at the end, so every pushed
+  run arrives complete (summary, leaderboard, analysis). Holdout runs get no
+  analysis. CLI wiring covered by a synthetic end-to-end test (25 tests).
 
 ## 2026-10-06 — J003 Plan: switch to XAUUSD (Dukascopy), fix FRED lags
 

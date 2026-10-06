@@ -39,3 +39,23 @@ def test_planted_signal_has_oos_skill_and_stable_features(tmp_path):
     assert d["oos_skill"] > 0.52 and d["folds_oos_skill"] >= 0.6   # daily edge of 0.15 sd -> AUC ~0.53
     assert d["top_features"][0]["feature"] == "ret_5" and d["top_features"][0]["sign_consistency"] == 1.0
     assert d["verdict"] != "NO_EDGE"
+
+
+def test_cli_run_writes_summary_leaderboard_and_analysis(tmp_path, monkeypatch):
+    """goldml.run end to end on a synthetic panel (no market data)."""
+    import goldml.run as runmod
+
+    exp_file = tmp_path / "e.py"
+    exp_file.write_text(
+        "from goldml.evaluate import Experiment\n"
+        "from tests.test_harness import logit\n"
+        "EXPERIMENTS = [Experiment('x', ['ret_5', 'ret_20'], 1, logit, first_test_start='2009-01-01', test_months=12)]\n")
+    monkeypatch.setattr(runmod, "RESULTS", tmp_path / "results")
+    monkeypatch.setattr(runmod, "REGISTRY", tmp_path / "results" / "trials.csv")
+    monkeypatch.setattr(runmod, "load_panel", lambda split, cand: make_panel(3000, seed=23))
+    monkeypatch.setattr(runmod, "snapshot_hash", lambda: "synthetic")
+    assert runmod.main([str(exp_file), "--run-id", "T9"]) == 0
+    out = tmp_path / "results"
+    for f in ("T9/summary.md", "T9/analysis.md", "T9/x/folds.csv", "LEADERBOARD.md", "trials.csv"):
+        assert (out / f).exists(), f
+    assert runmod.main([str(exp_file), "--run-id", "T9"]) == 2      # run ids are never reused

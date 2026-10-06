@@ -61,6 +61,10 @@ def main(argv=None) -> int:
     md = batch_report(results, a.run_id)
     (out_dir / "summary.md").write_text(md)
     print(md)
+    if a.split == "dev":                      # holdout results get no "what to tune next" advice
+        from .analyze import analyze_run
+        (out_dir / "analysis.md").write_text(analyze_run(out_dir))
+        print(f"analysis written to {out_dir / 'analysis.md'}")
     return 0
 
 
