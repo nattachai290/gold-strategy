@@ -1,0 +1,20 @@
+{
+  "fetched_utc": "2026-10-06T01:21:05+00:00",
+  "price_ticker": "GLD",
+  "price_rows": 5502,
+  "price_range": [
+    "2004-11-18",
+    "2026-10-02"
+  ],
+  "fred_series": {
+    "DFII10": "real_yield_10y",
+    "T10YIE": "breakeven_10y",
+    "DTWEXBGS": "usd_broad",
+    "VIXCLS": "vix"
+  },
+  "files": {
+    "prices.csv": "df16cf8131d9e1f5cc772802853aea1562bc4044c21666f18ef95d0a80f851f9",
+    "fred.csv": "510ba925ea1f67c63d8a28f440e1bd82e3e464295eb2d4a2a0dc31163ccc0e9b"
+  },
+  "issues": []
+}
