@@ -11,7 +11,9 @@ Newest entry first. Each run: plan → result → what was learned → next step
 - Consequence: the goal is market timing. Buy & hold gold over 2010-2023 is
   the hurdle; a model must earn a higher Sharpe after spread, not just a
   positive one.
-- Still open: the owner's actual spot spread (placeholder 10 bps one-way).
+- Account currency is USD (XAUUSD spot), so P&L is in USD and no THB FX
+  risk is modelled. GLD daily (USD) stays the price proxy.
+- Still open: the owner's actual spot spread in USD/oz (placeholder 10 bps one-way).
 
 ## 2026-10-06 — J000 Harness and data
 

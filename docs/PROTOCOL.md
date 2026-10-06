@@ -36,7 +36,7 @@ tried, or by just holding gold?
 
 ## Trading constraint and costs
 
-The owner trades **long-only spot gold** (decided 2026-10-06). Positions are
+The owner trades **long-only spot gold in USD** (XAUUSD, decided 2026-10-06). Positions are
 in `[0, 1]`: fully long or flat in cash, no shorting, no leverage, no swap.
 Cash earns nothing in the backtest (conservative). The question therefore is
 whether a model can **time** gold better than simply holding it.
