@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from . import metrics as M
-from .backtest import COST_PROFILES, PRIMARY_PROFILE, backtest, forward_log_return, next_period_return
+from .backtest import COST_PROFILES, LONG_ONLY, PRIMARY_PROFILE, backtest, forward_log_return, next_period_return
 from .features import build_features
 from .splits import train_slice, walk_forward
 
@@ -44,6 +44,8 @@ class Experiment:
 def default_position(pred: np.ndarray, target: str, deadband: float = 0.0) -> np.ndarray:
     centre = 0.5 if target == "direction" else 0.0
     x = pred - centre
+    if LONG_ONLY:
+        return np.where(x > deadband, 1.0, 0.0)
     return np.where(np.abs(x) > deadband, np.sign(x), 0.0)
 
 
@@ -76,7 +78,7 @@ def walk_forward_predict(exp: Experiment, panel: pd.DataFrame) -> pd.DataFrame:
         parts.append(pd.DataFrame({"fold": k, "pred": pred, "n_train": int(ok.sum())}, index=Xte.index))
     oos = pd.concat(parts)
     to_pos = exp.to_position or (lambda p: default_position(p, exp.target))
-    raw = pd.Series(to_pos(oos["pred"].to_numpy()), index=oos.index, dtype=float).fillna(0.0).clip(-1, 1)
+    raw = pd.Series(to_pos(oos["pred"].to_numpy()), index=oos.index, dtype=float).fillna(0.0).clip(0.0 if LONG_ONLY else -1.0, 1.0)
     raw[oos["pred"].isna()] = 0.0
     oos["raw_pos"] = raw
     oos["pos"] = raw.rolling(exp.horizon, min_periods=1).mean() if exp.smooth and exp.horizon > 1 else raw
@@ -91,7 +93,7 @@ def baseline_positions(panel: pd.DataFrame) -> dict[str, pd.Series]:
     return {
         "buy_hold": pd.Series(1.0, index=panel.index),
         "ma200_long_flat": (c > c.rolling(200).mean()).astype(float),
-        "mom250_long_short": np.sign(c.diff(250)).fillna(0.0),
+        "mom250_long_flat": (c.diff(250) > 0).astype(float),
     }
 
 
@@ -119,7 +121,7 @@ GATES = {
     "G1_sharpe": "primary net Sharpe >= 0.5 and bootstrap 95% CI lower bound > 0",
     "G2_deflated": "deflated Sharpe ratio >= 0.95 given all registered trials",
     "G3_beats_baselines": "P(Sharpe > best baseline Sharpe) >= 0.90 (paired block bootstrap, same costs)",
-    "G4_cost_stress": "net Sharpe > 0 under 2x costs, every cost profile",
+    "G4_cost_stress": "net Sharpe > 0 under 2x costs, every cost profile (primary is the binding one)",
     "G5_stability": "positive net return in >= 3 of 4 equal sub-periods",
     "G6_drawdown": "max drawdown >= -35%",
 }

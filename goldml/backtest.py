@@ -34,13 +34,17 @@ class CostProfile:
     short_carry_pa: float      # annual holding cost of a short position
 
 
+# The owner trades LONG-ONLY SPOT gold: positions are in [0, 1], no shorting, no swap.
+LONG_ONLY = True
+
 COST_PROFILES = {
-    # Retail spot gold CFD (XAUUSD, MT4/MT5-style broker). Conservative swaps.
-    "cfd": CostProfile("cfd", spread_bps=3.0, long_carry_pa=0.045, short_carry_pa=0.010),
-    # Gold ETF (GLD/IAU) on a low-cost broker; short borrow fee. Expense ratio is in the price.
-    "etf": CostProfile("etf", spread_bps=2.0, long_carry_pa=0.0, short_carry_pa=0.005),
+    # Retail spot gold, owned outright. 10 bps one-way (20 bps round trip) is a
+    # conservative retail spot spread + slippage until the owner confirms the real spread.
+    "spot": CostProfile("spot", spread_bps=10.0, long_carry_pa=0.0, short_carry_pa=0.0),
+    # Sensitivity: tight institutional/ETF-like spread.
+    "tight": CostProfile("tight", spread_bps=2.0, long_carry_pa=0.0, short_carry_pa=0.0),
 }
-PRIMARY_PROFILE = "cfd"
+PRIMARY_PROFILE = "spot"
 
 
 def backtest(position: pd.Series, R: pd.Series, cost: CostProfile, cost_mult: float = 1.0) -> pd.DataFrame:

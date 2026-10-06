@@ -1,4 +1,5 @@
 """R001 batch: first honest look. Four trials, fixed before any market result was seen.
+Long-only spot: each model's P(up) > 0.5 -> long, else flat (goldml.evaluate.default_position).
 
 E001a  logistic, price features, next-day direction (h=1)
 E001b  logistic, price features, 5-day direction, overlapping book (h=5)

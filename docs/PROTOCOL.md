@@ -34,18 +34,20 @@ tried, or by just holding gold?
 | development OOS | 2010-01-01 .. 2023-12-31 | walk-forward results, gates |
 | **holdout** | 2024-01-01 .. end of snapshot | one shot per sealed candidate |
 
-## Costs
+## Trading constraint and costs
 
-Positions are in `[-1, 1]` (no leverage). Two profiles, both always reported:
+The owner trades **long-only spot gold** (decided 2026-10-06). Positions are
+in `[0, 1]`: fully long or flat in cash, no shorting, no leverage, no swap.
+Cash earns nothing in the backtest (conservative). The question therefore is
+whether a model can **time** gold better than simply holding it.
 
-| profile | one-way spread+slippage | long carry / yr | short carry / yr |
-|---|---|---|---|
-| `cfd` (primary) | 3 bps | 4.5% | 1.0% |
-| `etf` | 2 bps | 0% | 0.5% |
+| profile | one-way spread+slippage | carry |
+|---|---|---|
+| `spot` (primary) | 10 bps (20 bps round trip) | 0 |
+| `tight` (sensitivity) | 2 bps | 0 |
 
-`cfd` approximates a retail XAUUSD CFD with conservative swaps and is the
-primary profile for the gates until the owner confirms the trading venue.
-Stress test: every cost x2.
+10 bps one-way is a conservative retail spot spread placeholder until the
+owner confirms the real spread. Stress test: every cost x2.
 
 ## Gates (development OOS, primary profile)
 
@@ -61,7 +63,8 @@ A configuration becomes a **candidate** only if all pass:
 | G6 | max drawdown >= -35% |
 
 Baselines on the same dates and costs: buy & hold, 200-day MA long/flat,
-250-day momentum long/short.
+250-day momentum long/flat. For a long-only timer, buy & hold is the real
+hurdle: G3 asks for a higher Sharpe than the best of these.
 
 ## Candidates and holdout
 

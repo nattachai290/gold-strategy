@@ -2,6 +2,17 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-06 — J001 Owner decision: long-only spot
+
+- Owner trades long-only spot gold. Harness changed before any market run:
+  positions clipped to `[0, 1]`, model output maps to long/flat, cost
+  profiles replaced by `spot` (10 bps one-way, primary) and `tight` (2 bps),
+  no carry. Baseline `mom250_long_short` became `mom250_long_flat`.
+- Consequence: the goal is market timing. Buy & hold gold over 2010-2023 is
+  the hurdle; a model must earn a higher Sharpe after spread, not just a
+  positive one.
+- Still open: the owner's actual spot spread (placeholder 10 bps one-way).
+
 ## 2026-10-06 — J000 Harness and data
 
 **Done**
@@ -24,5 +35,4 @@ Expectation set in advance: most likely no gate passes; the point is to see
 where gross edge exists, how much cost and carry take, and how the models
 compare with buy & hold over 2010-2023.
 
-**Open question for owner:** trading venue (CFD XAUUSD / futures / ETF) — it
-decides the primary cost profile.
+**Open question for owner:** trading venue — answered in J001 (long-only spot).
