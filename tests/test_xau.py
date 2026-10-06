@@ -73,3 +73,35 @@ def test_fred_lags_per_series():
     assert p["vix"].iloc[10] == 9
     assert p["real_yield_10y"].iloc[10] == 8
     assert p["usd_broad"].iloc[10] == 2
+
+
+def test_fetch_restore_roundtrip(tmp_path, monkeypatch):
+    """Offline: fake feed -> snapshot -> restore reproduces identical bytes; tampering is caught."""
+    import goldml.dukascopy as dk
+
+    h1 = make_h1("2020-01-01", days=62, seed=4)
+
+    def fake_get(url, tries=5):
+        side = "ASK" if "ASK" in url else "BID"
+        parts = url.split("/")
+        y, m = int(parts[-3]), int(parts[-2]) + 1
+        ms = pd.Timestamp(year=y, month=m, day=1)
+        sl = h1[(h1.index >= ms) & (h1.index < ms + pd.offsets.MonthBegin(1))]
+        if sl.empty:
+            return b""
+        bump = 0.15 if side == "ASK" else -0.15
+        return dk.encode_candles(sl[["open", "high", "low", "close"]].add(bump).assign(volume=sl["volume"]), ms)
+
+    fred = pd.DataFrame({"vix": np.arange(100.0)}, index=pd.bdate_range("2019-12-01", periods=100))
+    monkeypatch.setattr(dk, "_get", fake_get)
+    monkeypatch.setattr(dk, "fetch_fred", lambda: fred)
+    monkeypatch.setattr(dk.time, "sleep", lambda s: None)
+    m = dk.fetch_xau_snapshot("2020-01", "2020-02", tmp_path)
+    assert m["issues"] == [] and m["fred_end"] == "2020-02-29"
+    got = pd.read_csv(tmp_path / "h1.csv.gz", index_col=0, parse_dates=True)
+    assert got["spread_open"].round(3).eq(0.3).all()
+    assert dk.restore_xau_snapshot(tmp_path) == []
+    with pytest.raises(AssertionError):
+        monkeypatch.setattr(dk, "fetch_fred", lambda: fred.assign(vix=fred.vix + 1))
+        assert dk.restore_xau_snapshot(tmp_path) == []
+    assert "exec spread" in dk.quality_report(tmp_path)

@@ -2,7 +2,13 @@
 
 Run by the RUNNER (network), never by the planner:
 
-    python -m goldml.dukascopy fetch --start 2003 --end 2026-09
+    python -m goldml.dukascopy fetch --start 2003-05 --end 2026-09   # once: new snapshot + manifest
+    python -m goldml.dukascopy restore                               # every run: re-download, verify hashes
+    python -m goldml.dukascopy report                                # data-quality report (no returns)
+
+Data files are NOT committed (size). Only manifest.json is committed; it pins
+the month range and the SHA-256 of every file, so `restore` must reproduce the
+exact bytes or fail.
 
 Feed format (public datafeed, LZMA-compressed .bi5, big-endian):
     https://datafeed.dukascopy.com/datafeed/XAUUSD/{YYYY}/{MM-1:02d}/{BID|ASK}_candles_hour_1.bi5
@@ -130,16 +136,24 @@ def validate_h1(h1: pd.DataFrame) -> list[str]:
     return issues
 
 
-def fetch_xau_snapshot(start: str, end: str, out_dir: Path = XAU_SNAPSHOT_DIR) -> dict:
+def _write_files(out_dir: Path, start: str, end: str, fred_end: str) -> pd.DataFrame:
     out_dir.mkdir(parents=True, exist_ok=True)
     h1 = fetch_h1(start, end)
     h1.to_csv(out_dir / "h1.csv.gz", float_format="%.4f",
               compression={"method": "gzip", "mtime": 0})
     fred = fetch_fred()
+    fred = fred[fred.index <= pd.Timestamp(fred_end)]          # pin FRED to the snapshot end
     fred.to_csv(out_dir / "fred.csv", float_format="%.6f")
+    return h1
+
+
+def fetch_xau_snapshot(start: str, end: str, out_dir: Path = XAU_SNAPSHOT_DIR) -> dict:
+    fred_end = str((pd.Period(end, "M").end_time).date())
+    h1 = _write_files(out_dir, start, end, fred_end)
     manifest = {
         "fetched_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": f"dukascopy {SYMBOL} H1 bid/ask, mid prices", "price_scale": PRICE_SCALE,
+        "months": [start, end], "fred_end": fred_end,
         "h1_rows": int(len(h1)),
         "h1_range": [str(h1.index.min()), str(h1.index.max())],
         "files": {f: _sha256(out_dir / f) for f in ("h1.csv.gz", "fred.csv")},
@@ -185,16 +199,50 @@ def daily_from_h1(h1: pd.DataFrame, cut_hour: int = CUT_HOUR_UTC, exec_delay_h: 
     return out
 
 
+def restore_xau_snapshot(out_dir: Path = XAU_SNAPSHOT_DIR) -> list[str]:
+    """Re-download the files pinned by the committed manifest; return mismatching files."""
+    m = json.loads((out_dir / "manifest.json").read_text())
+    _write_files(out_dir, m["months"][0], m["months"][1], m["fred_end"])
+    return [f for f, h in m["files"].items() if _sha256(out_dir / f) != h]
+
+
+def quality_report(out_dir: Path = XAU_SNAPSHOT_DIR) -> str:
+    """Counts, gaps and spreads only - no returns, no performance."""
+    h1 = pd.read_csv(out_dir / "h1.csv.gz", index_col=0, parse_dates=True)
+    d = daily_from_h1(h1)
+    lines = [f"h1 rows {len(h1)}  {h1.index.min()} .. {h1.index.max()}",
+             f"daily rows {len(d)}  {d.index.min().date()} .. {d.index.max().date()}",
+             "issues: " + json.dumps(validate_h1(h1)), "",
+             "year | h1 bars | daily bars | median exec spread bps | p90 exec spread bps"]
+    hy = h1.groupby(h1.index.year).size()
+    for y, g in d.groupby(d.index.year):
+        s = g["exec_spread_bps"]
+        lines.append(f"{y} | {hy.get(y, 0)} | {len(g)} | {s.median():.2f} | {s.quantile(0.9):.2f}")
+    sp = h1["spread_open"] / h1["open"] * 1e4
+    lines += ["", "hour UTC | median spread bps (all years)"]
+    lines += [f"{hr:02d} | {v:.2f}" for hr, v in sp.groupby(h1.index.hour).median().items()]
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("fetch")
     f.add_argument("--start", default="2003-05")
     f.add_argument("--end", required=True, help="last COMPLETE month, YYYY-MM")
+    sub.add_parser("restore")
+    sub.add_parser("report")
     a = ap.parse_args(argv)
-    m = fetch_xau_snapshot(a.start, a.end)
-    print(json.dumps(m, indent=2))
-    return 1 if m["issues"] else 0
+    if a.cmd == "fetch":
+        m = fetch_xau_snapshot(a.start, a.end)
+        print(json.dumps(m, indent=2))
+        return 1 if m["issues"] else 0
+    if a.cmd == "restore":
+        bad = restore_xau_snapshot()
+        print("restore OK: hashes match manifest" if not bad else f"HASH MISMATCH: {bad}")
+        return 1 if bad else 0
+    print(quality_report())
+    return 0
 
 
 if __name__ == "__main__":

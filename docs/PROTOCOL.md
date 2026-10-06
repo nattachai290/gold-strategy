@@ -12,6 +12,12 @@ tried, or by just holding gold?
   13:00 UTC (20:00 Bangkok) using bars closed by then, fill at the open of the
   14:00 UTC bar (21:00 Bangkok), see `goldml/dukascopy.py`. The spread at the
   fill bar is kept (`exec_spread_bps`) to check the cost assumption.
+  Data files are **not committed** (size, owner's request). Only
+  `data/snapshot_xau/manifest.json` is: it pins the month range, the FRED end
+  date and SHA-256 of each file. Every run starts with
+  `python -m goldml.dukascopy restore`, which re-downloads and must reproduce
+  the hashes exactly; a mismatch (e.g. a vendor revision) stops the run and
+  becomes a planned, journaled new snapshot.
 - Current fallback: **GLD** daily OHLCV (Yahoo), 2004-11-18 onward. Chosen
   over `GC=F` because the continuous futures series has 441 rows of
   inconsistent OHLC, zero-volume days and roll gaps; GLD had none.

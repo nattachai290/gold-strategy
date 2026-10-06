@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 data/cache/
 results/**/scratch/
+# XAU data is re-downloaded by the runner (python -m goldml.dukascopy restore); only the manifest is committed
+data/snapshot_xau/*
+!data/snapshot_xau/manifest.json

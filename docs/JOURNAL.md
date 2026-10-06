@@ -17,6 +17,11 @@ Newest entry first. Each run: plan → result → what was learned → next step
   broad USD index is released weekly. Now 2 rows for DFII10/T10YIE, 8 for
   DTWEXBGS, 1 for VIX. Fixed before any market run.
 - R001 is on hold until the R000 snapshot is reviewed; it will run on XAU.
+- Owner: do not commit data (size). XAU data is gitignored; only the manifest
+  with hashes is committed and each run re-downloads and verifies
+  (`restore`). Risk noted: FRED or Dukascopy revisions would break the hash;
+  that is treated as a new snapshot event, not ignored. The small GLD
+  snapshot (0.7 MB) stays committed as the fallback.
 - Question for owner: is 21:00 Bangkok a time they can actually trade? The
   cut hour is a parameter and can change before R001 without a new download.
 
