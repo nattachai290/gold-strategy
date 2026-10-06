@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import lzma
+import random
 import struct
 import sys
 import time
@@ -74,21 +75,55 @@ def encode_candles(df: pd.DataFrame, month_start: pd.Timestamp, scale: float = P
 
 # --------------------------------------------------------------------------- fetch
 
-def _get(url: str, tries: int = 5) -> bytes:
+# The datafeed answered 429 to every request with Python's default User-Agent
+# (R000 attempt 1) but 200 to a browser one, and throttles bursts.
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                         "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+           "Accept": "*/*"}
+RETRY_CODES = {429, 500, 502, 503, 504}
+REQUEST_PAUSE = 1.0           # seconds between requests
+
+
+def _get(url: str, tries: int = 8, base_wait: float = 5.0, max_wait: float = 300.0) -> bytes:
+    """GET with browser UA; on 429/5xx/network errors back off (Retry-After or 5s*2^k, cap 5 min)."""
+    err: Exception | None = None
     for k in range(tries):
+        wait = min(max_wait, base_wait * 2 ** k) * (1 + 0.25 * random.random())
         try:
-            return urllib.request.urlopen(url, timeout=60).read()
+            req = urllib.request.Request(url, headers=HEADERS)
+            return urllib.request.urlopen(req, timeout=60).read()
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return b""
+            if e.code not in RETRY_CODES:
+                raise RuntimeError(f"failed to fetch {url}: {e}") from e
             err = e
-        except Exception as e:  # network hiccup
+            ra = e.headers.get("Retry-After") if e.headers else None
+            if ra and ra.strip().isdigit():
+                wait = min(max_wait, float(ra))
+        except Exception as e:  # timeouts, connection resets
             err = e
-        time.sleep(2 ** k)
-    raise RuntimeError(f"failed to fetch {url}: {err}")
+        if k < tries - 1:
+            print(f"  retry {k + 1}/{tries - 1} in {wait:.0f}s ({err})", file=sys.stderr)
+            time.sleep(wait)
+    raise RuntimeError(f"failed to fetch {url} after {tries} tries: {err}")
 
 
-def fetch_h1(start: str, end: str, sleep: float = 0.2) -> pd.DataFrame:
+def _get_cached(url: str, cache: Path | None) -> bytes:
+    """Raw files are cached so an interrupted fetch resumes where it stopped."""
+    if cache is not None and cache.exists():
+        return cache.read_bytes()
+    raw = _get(url)
+    if cache is not None:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache.with_suffix(".part")
+        tmp.write_bytes(raw)
+        tmp.replace(cache)
+    time.sleep(REQUEST_PAUSE)
+    return raw
+
+
+def fetch_h1(start: str, end: str, cache_dir: Path | None = None) -> pd.DataFrame:
     """Hourly mid OHLC + spread for months start..end inclusive ('YYYY' or 'YYYY-MM')."""
     months = pd.period_range(pd.Period(start, "M"), pd.Period(end, "M"), freq="M")
     parts = []
@@ -96,9 +131,9 @@ def fetch_h1(start: str, end: str, sleep: float = 0.2) -> pd.DataFrame:
         ms = p.start_time.tz_localize(None)
         sides = {}
         for side in ("BID", "ASK"):
-            raw = _get(URL.format(sym=SYMBOL, y=p.year, m=p.month - 1, side=side))
+            cache = cache_dir / f"{p.year}-{p.month:02d}_{side}.bi5" if cache_dir else None
+            raw = _get_cached(URL.format(sym=SYMBOL, y=p.year, m=p.month - 1, side=side), cache)
             sides[side] = decode_candles(raw, ms)
-            time.sleep(sleep)
         b, a = sides["BID"], sides["ASK"]
         if b.empty or a.empty:
             print(f"{p}: no data", file=sys.stderr)
@@ -138,12 +173,13 @@ def validate_h1(h1: pd.DataFrame) -> list[str]:
 
 def _write_files(out_dir: Path, start: str, end: str, fred_end: str) -> pd.DataFrame:
     out_dir.mkdir(parents=True, exist_ok=True)
-    h1 = fetch_h1(start, end)
-    h1.to_csv(out_dir / "h1.csv.gz", float_format="%.4f",
+    h1 = fetch_h1(start, end, cache_dir=out_dir / "raw")
+    # lineterminator fixed so the bytes (and hashes) are identical on Windows and Linux
+    h1.to_csv(out_dir / "h1.csv.gz", float_format="%.4f", lineterminator="\n",
               compression={"method": "gzip", "mtime": 0})
     fred = fetch_fred()
     fred = fred[fred.index <= pd.Timestamp(fred_end)]          # pin FRED to the snapshot end
-    fred.to_csv(out_dir / "fred.csv", float_format="%.6f")
+    fred.to_csv(out_dir / "fred.csv", float_format="%.6f", lineterminator="\n")
     return h1
 
 
@@ -159,7 +195,7 @@ def fetch_xau_snapshot(start: str, end: str, out_dir: Path = XAU_SNAPSHOT_DIR) -
         "files": {f: _sha256(out_dir / f) for f in ("h1.csv.gz", "fred.csv")},
         "issues": validate_h1(h1),
     }
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     return manifest
 
 
@@ -201,7 +237,7 @@ def daily_from_h1(h1: pd.DataFrame, cut_hour: int = CUT_HOUR_UTC, exec_delay_h: 
 
 def restore_xau_snapshot(out_dir: Path = XAU_SNAPSHOT_DIR) -> list[str]:
     """Re-download the files pinned by the committed manifest; return mismatching files."""
-    m = json.loads((out_dir / "manifest.json").read_text())
+    m = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
     _write_files(out_dir, m["months"][0], m["months"][1], m["fred_end"])
     return [f for f, h in m["files"].items() if _sha256(out_dir / f) != h]
 
@@ -224,6 +260,13 @@ def quality_report(out_dir: Path = XAU_SNAPSHOT_DIR) -> str:
     return "\n".join(lines)
 
 
+def _utf8_stdout() -> None:
+    try:                       # Windows consoles default to cp1252
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -233,6 +276,7 @@ def main(argv=None) -> int:
     sub.add_parser("restore")
     sub.add_parser("report")
     a = ap.parse_args(argv)
+    _utf8_stdout()
     if a.cmd == "fetch":
         m = fetch_xau_snapshot(a.start, a.end)
         print(json.dumps(m, indent=2))

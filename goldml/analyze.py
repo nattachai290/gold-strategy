@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -42,7 +43,7 @@ def _sharpe(x) -> float:
 
 
 def diagnose(exp_dir: Path) -> dict:
-    m = json.loads((exp_dir / "metrics.json").read_text())
+    m = json.loads((exp_dir / "metrics.json").read_text(encoding="utf-8"))
     oos = pd.read_csv(exp_dir / "oos.csv", index_col=0, parse_dates=True)
     folds = pd.read_csv(exp_dir / "folds.csv") if (exp_dir / "folds.csv").exists() else pd.DataFrame()
     imp = pd.read_csv(exp_dir / "importance.csv", index_col=0) if (exp_dir / "importance.csv").exists() else pd.DataFrame()
@@ -227,7 +228,11 @@ def main(argv=None) -> int:
     ap.add_argument("run_dir", type=Path)
     a = ap.parse_args(argv)
     md = analyze_run(a.run_dir)
-    (a.run_dir / "analysis.md").write_text(md)
+    (a.run_dir / "analysis.md").write_text(md, encoding="utf-8", newline="\n")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
     print(md)
     return 0
 

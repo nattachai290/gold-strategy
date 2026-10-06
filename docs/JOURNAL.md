@@ -2,6 +2,27 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-06 — J005 R000 attempt 1 failed (HTTP 429); fetch hardened
+
+**Result.** Runner (Windows 11, Python 3.13) got HTTP 429 on the 2nd file.
+Its probes: 9/9 requests with Python's default User-Agent -> 429; a browser
+User-Agent -> 200 (then 503 / connection resets when repeated quickly). No
+snapshot was created. Separately, pytest only passed with `PYTHONUTF8=1`:
+`analysis.md` (with ✓/✗) was written in cp1252.
+
+**Learned.** The datafeed filters default clients and throttles bursts; a
+5-try / 31 s backoff is far too short. Also found by review: on Windows,
+pandas writes CSV with CRLF and git may convert line endings, so snapshot
+hashes made on Windows would not match a Linux restore.
+
+**Changed (planner).** `_get`: browser User-Agent, 8 tries, backoff 5 s x 2^k
+(cap 5 min) or `Retry-After`; 1 s pause between requests; raw `.bi5` cache in
+`data/snapshot_xau/raw/` (gitignored) so a rerun resumes; all text output
+UTF-8 with LF; snapshot CSVs written with `\n`; `.gitattributes` keeps
+`data/**` byte-exact. 4 new synthetic tests (29 total).
+
+**Next.** R000 attempt 2 (`prompts/R000.md`), allowing up to 3 resumed reruns.
+
 ## 2026-10-06 — J004 Result analyzer
 
 - Owner asked for an analyzer that also says how to improve. Built

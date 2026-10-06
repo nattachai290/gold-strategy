@@ -39,6 +39,10 @@ def main(argv=None) -> int:
     ap.add_argument("--split", default="dev", choices=["dev", "holdout"])
     ap.add_argument("--candidate")
     a = ap.parse_args(argv)
+    try:                       # Windows consoles default to cp1252; reports contain ✓/✗
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
     out_dir = RESULTS / a.run_id
     if out_dir.exists():
@@ -57,13 +61,13 @@ def main(argv=None) -> int:
     results = run_experiments(exps, panel, a.run_id, out_dir, REGISTRY,
                               register=(a.split == "dev"), meta=meta)
     if a.split == "dev":
-        (RESULTS / "LEADERBOARD.md").write_text(leaderboard(REGISTRY))
+        (RESULTS / "LEADERBOARD.md").write_text(leaderboard(REGISTRY), encoding="utf-8", newline="\n")
     md = batch_report(results, a.run_id)
-    (out_dir / "summary.md").write_text(md)
+    (out_dir / "summary.md").write_text(md, encoding="utf-8", newline="\n")
     print(md)
     if a.split == "dev":                      # holdout results get no "what to tune next" advice
         from .analyze import analyze_run
-        (out_dir / "analysis.md").write_text(analyze_run(out_dir))
+        (out_dir / "analysis.md").write_text(analyze_run(out_dir), encoding="utf-8", newline="\n")
         print(f"analysis written to {out_dir / 'analysis.md'}")
     return 0
 

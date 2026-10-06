@@ -1,0 +1,2 @@
+# Snapshot files are hashed: never let git rewrite their line endings (Windows checkouts).
+data/** -text

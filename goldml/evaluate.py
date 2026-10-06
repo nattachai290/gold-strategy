@@ -234,11 +234,11 @@ def run_experiments(exps: list[Experiment], panel: pd.DataFrame, run_id: str, ou
                     "params": e.params, "model": repr(e.make_model()), "created_utc": ts, **(meta or {})})
         d = out_dir / e.name
         d.mkdir(parents=True, exist_ok=True)
-        (d / "metrics.json").write_text(json.dumps(res, indent=2, default=float) + "\n")
-        oos.to_csv(d / "oos.csv", float_format="%.6g")
-        runs[e.name][1].to_csv(d / "folds.csv", index=False, float_format="%.6g")
+        (d / "metrics.json").write_text(json.dumps(res, indent=2, default=float) + "\n", encoding="utf-8", newline="\n")
+        oos.to_csv(d / "oos.csv", float_format="%.6g", lineterminator="\n")
+        runs[e.name][1].to_csv(d / "folds.csv", index=False, float_format="%.6g", lineterminator="\n")
         if not runs[e.name][2].empty:
-            runs[e.name][2].to_csv(d / "importance.csv", index_label="fold", float_format="%.6g")
+            runs[e.name][2].to_csv(d / "importance.csv", index_label="fold", float_format="%.6g", lineterminator="\n")
         results.append(res)
     if register:
         append_registry(registry, [{

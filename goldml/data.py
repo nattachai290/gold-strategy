@@ -67,10 +67,10 @@ def fetch_snapshot(out_dir: Path = SNAPSHOT_DIR) -> dict:
     px = px.rename(columns=str.lower)[PRICE_COLS]
     px = px.dropna(subset=["close"])        # drop an unfinished current session
     px.index = pd.DatetimeIndex(px.index.date, name="date")
-    px.to_csv(out_dir / "prices.csv", float_format="%.6f")
+    px.to_csv(out_dir / "prices.csv", float_format="%.6f", lineterminator="\n")
 
     fred = fetch_fred()
-    fred.to_csv(out_dir / "fred.csv", float_format="%.6f")
+    fred.to_csv(out_dir / "fred.csv", float_format="%.6f", lineterminator="\n")
 
     manifest = {
         "fetched_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -81,7 +81,7 @@ def fetch_snapshot(out_dir: Path = SNAPSHOT_DIR) -> dict:
         "files": {f: _sha256(out_dir / f) for f in ("prices.csv", "fred.csv")},
     }
     manifest["issues"] = validate_prices(px)
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     return manifest
 
 
@@ -99,13 +99,13 @@ def fetch_fred() -> pd.DataFrame:
 
 def snapshot_hash(snap_dir: Path | None = None) -> str:
     snap_dir = snap_dir or DATA_SOURCES[DATA_SOURCE]
-    m = json.loads((snap_dir / "manifest.json").read_text())
+    m = json.loads((snap_dir / "manifest.json").read_text(encoding="utf-8"))
     return hashlib.sha256(json.dumps(m["files"], sort_keys=True).encode()).hexdigest()[:12]
 
 
 def load_raw(snap_dir: Path | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     snap_dir = snap_dir or DATA_SOURCES[DATA_SOURCE]
-    m = json.loads((snap_dir / "manifest.json").read_text())
+    m = json.loads((snap_dir / "manifest.json").read_text(encoding="utf-8"))
     for f, h in m["files"].items():
         if _sha256(snap_dir / f) != h:
             raise RuntimeError(f"snapshot file {f} does not match manifest hash")
@@ -167,7 +167,7 @@ def _check_candidate(candidate: str, log_path: Path, cand_dir: Path) -> None:
     spec = cand_dir / f"{candidate}.json"
     if not spec.exists():
         raise HoldoutLocked(f"no sealed candidate file {spec}")
-    if not json.loads(spec.read_text()).get("sealed"):
+    if not json.loads(spec.read_text(encoding="utf-8")).get("sealed"):
         raise HoldoutLocked(f"candidate {candidate} is not sealed")
     if log_path.exists():
         with log_path.open() as f:

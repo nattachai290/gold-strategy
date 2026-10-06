@@ -105,3 +105,77 @@ def test_fetch_restore_roundtrip(tmp_path, monkeypatch):
         monkeypatch.setattr(dk, "fetch_fred", lambda: fred.assign(vix=fred.vix + 1))
         assert dk.restore_xau_snapshot(tmp_path) == []
     assert "exec spread" in dk.quality_report(tmp_path)
+
+
+def test_get_sends_browser_ua_and_backs_off_on_429(monkeypatch):
+    import io
+    import urllib.error
+
+    import goldml.dukascopy as dk
+
+    calls, sleeps = [], []
+
+    def fake_urlopen(req, timeout):
+        calls.append(req.get_header("User-agent"))
+        if len(calls) < 3:
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {"Retry-After": "7"}, None)
+        return io.BytesIO(b"ok")
+
+    monkeypatch.setattr(dk.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(dk.time, "sleep", sleeps.append)
+    assert dk._get("https://x/y.bi5") == b"ok"
+    assert len(calls) == 3 and all(ua.startswith("Mozilla/5.0") for ua in calls)
+    assert sleeps == [7.0, 7.0]                                   # honours Retry-After
+
+
+def test_get_gives_up_with_clear_error(monkeypatch):
+    import urllib.error
+
+    import goldml.dukascopy as dk
+
+    def always_429(req, timeout):
+        raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+
+    monkeypatch.setattr(dk.urllib.request, "urlopen", always_429)
+    monkeypatch.setattr(dk.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError, match="after 3 tries"):
+        dk._get("https://x/y.bi5", tries=3)
+
+
+def test_interrupted_fetch_resumes_from_cache(tmp_path, monkeypatch):
+    import goldml.dukascopy as dk
+
+    h1 = make_h1("2020-01-01", days=62, seed=5)
+    n = {"calls": 0, "fail_after": 2}
+
+    def flaky_get(url, tries=8):
+        n["calls"] += 1
+        if n["fail_after"] is not None and n["calls"] > n["fail_after"]:
+            raise RuntimeError("HTTP 429")
+        parts = url.split("/")
+        ms = pd.Timestamp(year=int(parts[-3]), month=int(parts[-2]) + 1, day=1)
+        sl = h1[(h1.index >= ms) & (h1.index < ms + pd.offsets.MonthBegin(1))]
+        return dk.encode_candles(sl[["open", "high", "low", "close", "volume"]], ms)
+
+    monkeypatch.setattr(dk, "_get", flaky_get)
+    monkeypatch.setattr(dk.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError):
+        dk.fetch_h1("2020-01", "2020-02", cache_dir=tmp_path)        # dies after January
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["2020-01_ASK.bi5", "2020-01_BID.bi5"]
+    n["calls"], n["fail_after"] = 0, None
+    out = dk.fetch_h1("2020-01", "2020-02", cache_dir=tmp_path)
+    assert n["calls"] == 2                                            # only February downloaded
+    assert out.index.min() < pd.Timestamp("2020-02-01") < out.index.max()
+
+
+def test_snapshot_csv_uses_lf_line_endings(tmp_path, monkeypatch):
+    import gzip
+
+    import goldml.dukascopy as dk
+
+    h1 = make_h1("2020-01-01", days=20, seed=6)
+    monkeypatch.setattr(dk, "fetch_h1", lambda s, e, cache_dir=None: h1)
+    monkeypatch.setattr(dk, "fetch_fred", lambda: pd.DataFrame({"vix": [1.0]}, index=pd.DatetimeIndex(["2020-01-02"], name="date")))
+    dk._write_files(tmp_path, "2020-01", "2020-01", "2020-01-31")
+    assert b"\r\n" not in gzip.decompress((tmp_path / "h1.csv.gz").read_bytes())
+    assert b"\r\n" not in (tmp_path / "fred.csv").read_bytes()
