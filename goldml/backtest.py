@@ -38,9 +38,9 @@ class CostProfile:
 LONG_ONLY = True
 
 COST_PROFILES = {
-    # Owner's venue: Dime! / YLG spot gold in USD. Observed quote 2026-10-06:
-    # sell 4128.97 / buy 4129.20 = $0.23/oz = 0.56 bps round trip (~0.28 bps one-way).
-    # Primary uses 2 bps one-way (~7x observed) to cover wider off-hours spreads,
+    # Owner's venue: MTS Gold via Dime!, spot in USD. Observed quote 2026-10-06:
+    # sell 4130.48 / buy 4130.83 = $0.35/oz = 0.85 bps round trip (~0.42 bps one-way).
+    # Primary uses 2 bps one-way (~5x observed) to cover wider off-hours spreads,
     # slippage and the GLD-open vs execution-time mismatch.
     "spot": CostProfile("spot", spread_bps=2.0, long_carry_pa=0.0, short_carry_pa=0.0),
     # Sensitivity: much wider retail spread. Reported, not gated.

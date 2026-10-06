@@ -46,9 +46,9 @@ whether a model can **time** gold better than simply holding it.
 | `spot` (primary) | 2 bps | 0 |
 | `wide` (sensitivity, not gated) | 10 bps | 0 |
 
-Venue: Dime! / YLG spot gold. Observed quote 2026-10-06: sell 4,128.97 /
-buy 4,129.20 USD/oz = $0.23 spread = 0.56 bps round trip. The primary 2 bps
-one-way (~7x observed) covers wider off-hours spreads, slippage and the gap
+Venue: MTS Gold via Dime!, spot in USD. Observed quote 2026-10-06: sell
+4,130.48 / buy 4,130.83 USD/oz = $0.35 spread = 0.85 bps round trip. The
+primary 2 bps one-way (~5x observed) covers wider off-hours spreads, slippage and the gap
 between the GLD open used in the backtest and the owner's real fill.
 Stress test (G4): primary costs x2.
 

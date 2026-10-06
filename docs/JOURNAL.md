@@ -13,9 +13,9 @@ Newest entry first. Each run: plan → result → what was learned → next step
   positive one.
 - Account currency is USD (XAUUSD spot), so P&L is in USD and no THB FX
   risk is modelled. GLD daily (USD) stays the price proxy.
-- Spread from the owner's venue (Dime! / YLG, quote 2026-10-06): $0.23/oz on
-  $4,129 = 0.56 bps round trip. Primary cost set to 2 bps one-way (~7x
-  observed, margin for off-hours, slippage, proxy timing); `wide` 10 bps kept
+- Spread from the owner's venue (MTS Gold via Dime!, quote 2026-10-06;
+  corrected from a YLG quote the owner sent first): $0.35/oz on $4,131 =
+  0.85 bps round trip. Primary cost set to 2 bps one-way (~5x observed, margin for off-hours, slippage, proxy timing); `wide` 10 bps kept
   as an ungated sensitivity. G4 now stresses the primary profile only.
   Set before R001 ran. One quote is thin evidence: if the owner can share
   quotes at other times (US open, Asia night, news), revisit.
