@@ -2,6 +2,26 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-06 — J002 Data check: GLD vs world spot gold
+
+Owner asked whether GLD matches world spot. Compared GLD close with Alpha
+Vantage daily XAU spot (USD/oz), dev period only (2011-06-01 .. 2023-12-29,
+3167 common days; holdout not touched):
+
+- Level: GLD/spot ratio 0.0973 -> 0.0924, drift -0.41%/yr = GLD expense
+  ratio (0.40%). GLD under-states spot by that much per year: conservative.
+- Return correlation: daily 0.92, weekly 0.965, monthly 0.996. Tracking error
+  6.1% / 4.2% / 1.5% per year.
+- Daily gap is a timestamp effect: the spot print is taken at a different time
+  of day than the GLD 16:00 NY close (lag/lead correlations ~0).
+- Consequence: over weeks and months GLD is the spot price. Day to day, what
+  the backtest earns depends on trading at the time it assumes (GLD open,
+  09:30 NY = 20:30/21:30 Bangkok). Short-horizon models (h=1) are the most
+  exposed to this; a live rule must execute in that window.
+- Alpha Vantage spot starts 2011-06, too short for the 2005 warm-up, so GLD
+  stays the research series. Possible follow-up: re-run a finished candidate
+  on spot as a robustness check (planned, journaled, counted as a trial).
+
 ## 2026-10-06 — J001 Owner decision: long-only spot
 
 - Owner trades long-only spot gold. Harness changed before any market run:
