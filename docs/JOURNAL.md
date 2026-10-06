@@ -2,6 +2,21 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-06 — J004 Result analyzer
+
+- Owner asked for an analyzer that also says how to improve. Built
+  `goldml/analyze.py`: fold consistency, decay, train-vs-OOS skill, cost drag,
+  exposure, importance stability -> verdict ACCEPT / OVERFIT / NO_EDGE /
+  FRAGILE plus rule-based "Next" ideas. Rejected a single weighted quality
+  score: arbitrary weights, and one fatal failure can hide behind a high
+  total. Gates stay pass/fail.
+- Runs now also save `folds.csv` (train and OOS AUC/IC per fold) and
+  `importance.csv` (per-fold feature importance).
+- Guardrail: every "Next" is a new trial. Parameter sensitivity is now
+  required before sealing a candidate (PROTOCOL).
+- Synthetic check: a deep LightGBM on a random walk gets OVERFIT (train AUC
+  1.00, OOS 0.50); a logistic on a planted 5-day signal gets ACCEPT.
+
 ## 2026-10-06 — J003 Plan: switch to XAUUSD (Dukascopy), fix FRED lags
 
 - Owner wants XAU itself. Dukascopy is blocked for the planner, but the runner

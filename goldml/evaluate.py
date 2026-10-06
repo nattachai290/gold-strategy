@@ -51,14 +51,47 @@ def default_position(pred: np.ndarray, target: str, deadband: float = 0.0) -> np
 
 # --------------------------------------------------------------------------- walk-forward
 
+def _importance(model, n: int) -> np.ndarray | None:
+    """Per-feature importance: |coef| for linear models (inputs are standardized), split gain share for trees."""
+    est = model.steps[-1][1] if hasattr(model, "steps") else model
+    if hasattr(est, "feature_importances_"):
+        v = np.asarray(est.feature_importances_, dtype=float)
+        v = v / v.sum() if v.sum() > 0 else v
+    elif hasattr(est, "coef_"):
+        v = np.asarray(est.coef_, dtype=float).ravel()
+    else:
+        return None
+    return v if len(v) == n else None
+
+
+def _skill(pred: np.ndarray, y: np.ndarray, target: str) -> dict:
+    """AUC + hit rate for direction models, rank IC for return models."""
+    from scipy.stats import spearmanr
+    from sklearn.metrics import roc_auc_score
+    ok = ~(np.isnan(pred) | np.isnan(y))
+    p, t = pred[ok], y[ok]
+    if len(p) < 20:
+        return {}
+    if target == "direction":
+        up = (t > 0).astype(int)
+        auc = roc_auc_score(up, p) if 0 < up.mean() < 1 else np.nan
+        return {"auc": float(auc), "hit": float(((p > 0.5) == up).mean())}
+    return {"ic": float(spearmanr(p, t).statistic)}
+
+
 def walk_forward_predict(exp: Experiment, panel: pd.DataFrame) -> pd.DataFrame:
+    return walk_forward_run(exp, panel)[0]
+
+
+def walk_forward_run(exp: Experiment, panel: pd.DataFrame):
+    """Returns (oos, fold_stats, importance). fold_stats compares in-sample vs OOS skill per fold."""
     X = build_features(panel)[exp.features]
     y = forward_log_return(panel, exp.horizon)
     R = next_period_return(panel)
     folds = walk_forward(panel.index, exp.first_test_start, exp.horizon, exp.test_months)
     if not folds:
         raise ValueError("no walk-forward folds; check dates")
-    parts = []
+    parts, fstats, imps = [], [], []
     for k, fold in enumerate(folds):
         tr = train_slice(fold, exp.train_window)
         Xtr, ytr = X.iloc[tr], y.iloc[tr]
@@ -76,6 +109,19 @@ def walk_forward_predict(exp: Experiment, panel: pd.DataFrame) -> pd.DataFrame:
             xv = Xte.to_numpy()[valid]
             pred[valid] = model.predict_proba(xv)[:, 1] if exp.target == "direction" else model.predict(xv)
         parts.append(pd.DataFrame({"fold": k, "pred": pred, "n_train": int(ok.sum())}, index=Xte.index))
+        xt = Xtr.to_numpy()
+        ptr = model.predict_proba(xt)[:, 1] if exp.target == "direction" else model.predict(xt)
+        s_in = _skill(ptr, ytr.to_numpy(), exp.target)
+        s_out = _skill(pred, y.iloc[fold.test_start:fold.test_end].to_numpy(), exp.target)
+        fstats.append({"fold": k, "train_start": str(X.index[tr.start].date()),
+                       "train_end": str(X.index[fold.train_end - 1].date()),
+                       "test_start": str(X.index[fold.test_start].date()),
+                       "test_end": str(X.index[fold.test_end - 1].date()), "n_train": int(ok.sum()),
+                       **{f"train_{k2}": v for k2, v in s_in.items()},
+                       **{f"oos_{k2}": v for k2, v in s_out.items()}})
+        imp = _importance(model, len(exp.features))
+        if imp is not None:
+            imps.append(pd.Series(imp, index=exp.features, name=k))
     oos = pd.concat(parts)
     to_pos = exp.to_position or (lambda p: default_position(p, exp.target))
     raw = pd.Series(to_pos(oos["pred"].to_numpy()), index=oos.index, dtype=float).fillna(0.0).clip(0.0 if LONG_ONLY else -1.0, 1.0)
@@ -83,7 +129,8 @@ def walk_forward_predict(exp: Experiment, panel: pd.DataFrame) -> pd.DataFrame:
     oos["raw_pos"] = raw
     oos["pos"] = raw.rolling(exp.horizon, min_periods=1).mean() if exp.smooth and exp.horizon > 1 else raw
     oos["R"] = R.reindex(oos.index)
-    return oos.dropna(subset=["R"])
+    importance = pd.concat(imps, axis=1).T if imps else pd.DataFrame()
+    return oos.dropna(subset=["R"]), pd.DataFrame(fstats), importance
 
 
 # --------------------------------------------------------------------------- baselines
@@ -170,7 +217,8 @@ def run_experiments(exps: list[Experiment], panel: pd.DataFrame, run_id: str, ou
                     registry: Path, register: bool = True, meta: dict | None = None) -> list[dict]:
     """Evaluate a batch. All experiments in the batch count as trials (registered first)."""
     reg = read_registry(registry)
-    oos_all = {e.name: walk_forward_predict(e, panel) for e in exps}
+    runs = {e.name: walk_forward_run(e, panel) for e in exps}
+    oos_all = {n: r[0] for n, r in runs.items()}
     prim = COST_PROFILES[PRIMARY_PROFILE]
     batch_sharpes = {n: M.sharpe(backtest(o["pos"], o["R"], prim)["net"]) for n, o in oos_all.items()}
     n_trials = len(reg) + len(exps)
@@ -188,6 +236,9 @@ def run_experiments(exps: list[Experiment], panel: pd.DataFrame, run_id: str, ou
         d.mkdir(parents=True, exist_ok=True)
         (d / "metrics.json").write_text(json.dumps(res, indent=2, default=float) + "\n")
         oos.to_csv(d / "oos.csv", float_format="%.6g")
+        runs[e.name][1].to_csv(d / "folds.csv", index=False, float_format="%.6g")
+        if not runs[e.name][2].empty:
+            runs[e.name][2].to_csv(d / "importance.csv", index_label="fold", float_format="%.6g")
         results.append(res)
     if register:
         append_registry(registry, [{

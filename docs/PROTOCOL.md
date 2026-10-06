@@ -82,6 +82,33 @@ Baselines on the same dates and costs: buy & hold, 200-day MA long/flat,
 250-day momentum long/flat. For a long-only timer, buy & hold is the real
 hurdle: G3 asks for a higher Sharpe than the best of these.
 
+## Result analyzer
+
+After every run the planner runs `python -m goldml.analyze results/RNNN`
+(diagnostics on recorded files only) and writes `results/RNNN/analysis.md`.
+Per experiment it reports fold consistency (share of walk-forward blocks that
+beat buy & hold), decay (yearly excess vs buy & hold, first vs second half),
+train vs out-of-sample skill (AUC or rank IC per fold), cost drag, exposure,
+and feature-importance stability, then a verdict:
+
+| verdict | meaning |
+|---|---|
+| ACCEPT | all gates pass, >= 60% of folds beat buy & hold, no decay |
+| OVERFIT | learns training data but not OOS, or the Sharpe is explained by the trial count |
+| NO_EDGE | no OOS skill and no timing value over buy & hold |
+| FRAGILE | some edge, but breaks under costs, sub-periods, folds, time or drawdown |
+
+Each verdict comes with "Next" recommendations. A recommendation is always a
+**new** experiment (new name, committed before it runs, counted as a trial).
+The analyzer is a guide for what to try, not a licence to re-tune the same
+experiment on the same OOS data.
+
+**Parameter sensitivity (required before sealing).** An ACCEPT experiment is
+re-run with neighbouring settings (each key parameter one step down and up).
+To be sealed, every neighbour must keep net Sharpe > 0 and the median
+neighbour must keep >= 50% of the experiment's net Sharpe. Neighbours count
+as trials.
+
 ## Candidates and holdout
 
 1. Planner writes `candidates/CNNN.py` (the exact frozen `EXPERIMENTS`, one

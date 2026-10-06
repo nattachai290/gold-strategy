@@ -13,6 +13,8 @@ ourselves hard.
 - `results/` — run outputs, `trials.csv` (every trial ever evaluated) and
   `LEADERBOARD.md` (all trials ranked; the place to see which model is best)
 - `candidates/` — sealed candidates for the one-shot holdout
+- `results/RNNN/analysis.md` — analyzer verdict per experiment
+  (ACCEPT / OVERFIT / NO_EDGE / FRAGILE) and what to try next
 
 Naming: `RNNN` = a run (one round the runner executes), `ENNNx` = an
 experiment (one model configuration = one trial; a run can hold several),
