@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .data import REPO, load_panel, snapshot_hash
 from .evaluate import run_experiments
-from .report import batch_report
+from .report import batch_report, leaderboard
 
 RESULTS = REPO / "results"
 REGISTRY = RESULTS / "trials.csv"
@@ -56,6 +56,8 @@ def main(argv=None) -> int:
             "experiment_file": str(a.experiment_file)}
     results = run_experiments(exps, panel, a.run_id, out_dir, REGISTRY,
                               register=(a.split == "dev"), meta=meta)
+    if a.split == "dev":
+        (RESULTS / "LEADERBOARD.md").write_text(leaderboard(REGISTRY))
     md = batch_report(results, a.run_id)
     (out_dir / "summary.md").write_text(md)
     print(md)

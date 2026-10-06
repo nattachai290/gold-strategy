@@ -144,6 +144,9 @@ def test_trials_accumulate(tmp_path):
     run_experiments([_exp("a"), _exp("b")], p, "T3", tmp_path / "o1", reg)
     r = run_experiments([_exp("c")], p, "T4", tmp_path / "o2", reg)[0]
     assert r["stats"]["n_trials"] == 3
+    from goldml.report import leaderboard
+    lb = leaderboard(reg)
+    assert "Total trials: 3" in lb and lb.count("| T3 |") == 2 and "| T4 | c |" in lb
 
 
 # ----------------------------------------------------------------- data guard

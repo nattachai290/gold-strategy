@@ -193,6 +193,8 @@ def run_experiments(exps: list[Experiment], panel: pd.DataFrame, run_id: str, ou
         append_registry(registry, [{
             "run_id": run_id, "experiment": r["experiment"], "config_hash": r["config_hash"],
             "sharpe_primary": round(batch_sharpes[r["experiment"]], 6),
-            "created_utc": ts, "pass_all": r["pass_all"],
+            "dsr_at_run": round(r["stats"]["deflated_sharpe"], 4),
+            "gates_passed": sum(r["gates"].values()), "pass_all": r["pass_all"],
+            "created_utc": ts,
         } for r in results])
     return results

@@ -1,5 +1,9 @@
-"""Markdown summary of a batch of results."""
+"""Markdown summary of a batch of results, and the all-time leaderboard."""
 from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
 
 
 def _f(x, pct=False):
@@ -27,4 +31,20 @@ def batch_report(results: list[dict], run_id: str) -> str:
         for b, m in results[0]["baselines"].items():
             lines.append(f"| {b} | {_f(m['sharpe'])} | {_f(m['cagr'], True)} | {_f(m['max_dd'], True)} |")
         lines += ["", "Gate order: " + ", ".join(results[0]["gates"].keys())]
+    return "\n".join(lines) + "\n"
+
+
+def leaderboard(registry: Path, top: int = 30) -> str:
+    """Every dev trial ever run, best first: gates passed, then primary net Sharpe."""
+    t = pd.read_csv(registry)
+    t = t.sort_values(["gates_passed", "sharpe_primary"], ascending=False).head(top)
+    lines = ["# Leaderboard (development OOS, all trials)", "",
+             f"Total trials: {len(pd.read_csv(registry))}. Ranked by gates passed (of 6), then net Sharpe "
+             "(spot costs). DSR is as computed at that run; it falls as more trials are added. "
+             "Only a row with pass_all=True can become a candidate.", "",
+             "| rank | run | experiment | net Sharpe | DSR at run | gates | pass_all |",
+             "|---|---|---|---|---|---|---|"]
+    for i, r in enumerate(t.itertuples(), 1):
+        lines.append(f"| {i} | {r.run_id} | {r.experiment} | {r.sharpe_primary:.2f} | {r.dsr_at_run:.2f} "
+                     f"| {r.gates_passed}/6 | {r.pass_all} |")
     return "\n".join(lines) + "\n"
