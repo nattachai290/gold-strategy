@@ -129,8 +129,8 @@ def test_random_walk_shows_no_edge(tmp_path):
 def test_planted_signal_is_detected_and_costs_bite(tmp_path):
     p = make_panel(3200, seed=12, signal=0.15)
     res = run_experiments([_exp("sig", features=["ret_5"])], p, "T2", tmp_path / "out", tmp_path / "trials.csv")[0]
-    assert res["profiles"]["tight"]["gross_sharpe"] > 1.0     # long-only oracle on ret_5 > 0 gives ~1.7
-    assert res["profiles"]["spot"]["sharpe"] < res["profiles"]["tight"]["sharpe"] < res["profiles"]["spot"]["gross_sharpe"]
+    assert res["profiles"]["spot"]["gross_sharpe"] > 1.0      # long-only oracle on ret_5 > 0 gives ~1.7
+    assert res["profiles"]["wide"]["sharpe"] < res["profiles"]["spot"]["sharpe"] < res["profiles"]["spot"]["gross_sharpe"]
     assert res["gates"]["G1_sharpe"]
     saved = json.loads((tmp_path / "out" / "sig" / "metrics.json").read_text())
     assert saved["experiment"] == "sig"

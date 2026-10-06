@@ -43,11 +43,14 @@ whether a model can **time** gold better than simply holding it.
 
 | profile | one-way spread+slippage | carry |
 |---|---|---|
-| `spot` (primary) | 10 bps (20 bps round trip) | 0 |
-| `tight` (sensitivity) | 2 bps | 0 |
+| `spot` (primary) | 2 bps | 0 |
+| `wide` (sensitivity, not gated) | 10 bps | 0 |
 
-10 bps one-way is a conservative retail spot spread placeholder until the
-owner confirms the real spread. Stress test: every cost x2.
+Venue: Dime! / YLG spot gold. Observed quote 2026-10-06: sell 4,128.97 /
+buy 4,129.20 USD/oz = $0.23 spread = 0.56 bps round trip. The primary 2 bps
+one-way (~7x observed) covers wider off-hours spreads, slippage and the gap
+between the GLD open used in the backtest and the owner's real fill.
+Stress test (G4): primary costs x2.
 
 ## Gates (development OOS, primary profile)
 
@@ -58,7 +61,7 @@ A configuration becomes a **candidate** only if all pass:
 | G1 | net Sharpe >= 0.5 and stationary-bootstrap 95% CI lower bound > 0 |
 | G2 | deflated Sharpe ratio >= 0.95, using every trial in `results/trials.csv` |
 | G3 | P(Sharpe > best baseline Sharpe) >= 0.90 (paired block bootstrap, same costs) |
-| G4 | net Sharpe > 0 under 2x costs, in every cost profile |
+| G4 | net Sharpe > 0 under 2x primary costs |
 | G5 | positive net return in >= 3 of 4 equal sub-periods |
 | G6 | max drawdown >= -35% |
 

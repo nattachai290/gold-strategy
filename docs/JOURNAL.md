@@ -13,7 +13,12 @@ Newest entry first. Each run: plan → result → what was learned → next step
   positive one.
 - Account currency is USD (XAUUSD spot), so P&L is in USD and no THB FX
   risk is modelled. GLD daily (USD) stays the price proxy.
-- Still open: the owner's actual spot spread in USD/oz (placeholder 10 bps one-way).
+- Spread from the owner's venue (Dime! / YLG, quote 2026-10-06): $0.23/oz on
+  $4,129 = 0.56 bps round trip. Primary cost set to 2 bps one-way (~7x
+  observed, margin for off-hours, slippage, proxy timing); `wide` 10 bps kept
+  as an ungated sensitivity. G4 now stresses the primary profile only.
+  Set before R001 ran. One quote is thin evidence: if the owner can share
+  quotes at other times (US open, Asia night, news), revisit.
 
 ## 2026-10-06 — J000 Harness and data
 

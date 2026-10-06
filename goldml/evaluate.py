@@ -121,7 +121,7 @@ GATES = {
     "G1_sharpe": "primary net Sharpe >= 0.5 and bootstrap 95% CI lower bound > 0",
     "G2_deflated": "deflated Sharpe ratio >= 0.95 given all registered trials",
     "G3_beats_baselines": "P(Sharpe > best baseline Sharpe) >= 0.90 (paired block bootstrap, same costs)",
-    "G4_cost_stress": "net Sharpe > 0 under 2x costs, every cost profile (primary is the binding one)",
+    "G4_cost_stress": "net Sharpe > 0 under 2x primary costs",
     "G5_stability": "positive net return in >= 3 of 4 equal sub-periods",
     "G6_drawdown": "max drawdown >= -35%",
 }
@@ -157,7 +157,7 @@ def evaluate_oos(oos: pd.DataFrame, panel: pd.DataFrame, n_trials: int, trial_sh
         "G1_sharpe": p["sharpe"] >= 0.5 and p["sharpe_ci95"][0] > 0,
         "G2_deflated": dsr >= 0.95,
         "G3_beats_baselines": p_beat >= 0.90,
-        "G4_cost_stress": all(v["sharpe_2x_cost"] > 0 for v in out["profiles"].values()),
+        "G4_cost_stress": p["sharpe_2x_cost"] > 0,
         "G5_stability": sum(x > 0 for x in sub) >= 3,
         "G6_drawdown": p["max_dd"] >= -0.35,
     }

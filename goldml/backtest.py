@@ -38,11 +38,13 @@ class CostProfile:
 LONG_ONLY = True
 
 COST_PROFILES = {
-    # Retail spot gold, owned outright. 10 bps one-way (20 bps round trip) is a
-    # conservative retail spot spread + slippage until the owner confirms the real spread.
-    "spot": CostProfile("spot", spread_bps=10.0, long_carry_pa=0.0, short_carry_pa=0.0),
-    # Sensitivity: tight institutional/ETF-like spread.
-    "tight": CostProfile("tight", spread_bps=2.0, long_carry_pa=0.0, short_carry_pa=0.0),
+    # Owner's venue: Dime! / YLG spot gold in USD. Observed quote 2026-10-06:
+    # sell 4128.97 / buy 4129.20 = $0.23/oz = 0.56 bps round trip (~0.28 bps one-way).
+    # Primary uses 2 bps one-way (~7x observed) to cover wider off-hours spreads,
+    # slippage and the GLD-open vs execution-time mismatch.
+    "spot": CostProfile("spot", spread_bps=2.0, long_carry_pa=0.0, short_carry_pa=0.0),
+    # Sensitivity: much wider retail spread. Reported, not gated.
+    "wide": CostProfile("wide", spread_bps=10.0, long_carry_pa=0.0, short_carry_pa=0.0),
 }
 PRIMARY_PROFILE = "spot"
 
