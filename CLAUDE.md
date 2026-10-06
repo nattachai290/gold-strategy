@@ -38,6 +38,7 @@ costs**, proven honestly. Read `docs/PROTOCOL.md` before doing anything.
 pip install -e '.[dev]'
 pytest                                                    # synthetic tests only
 python -m goldml.run experiments/<file>.py --run-id RNNN  # runner only
+python -m goldml.dukascopy fetch --end YYYY-MM              # runner only (network)
 ```
 
 Branch: the planner develops on its feature branch; the runner pushes results

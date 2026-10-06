@@ -2,10 +2,11 @@
 
 Conventions
 -----------
-* Row t is one trading day of the traded instrument (GLD, NYSE hours).
-* Everything stored in row t is known at the *close* of day t.
-* Macro series (FRED) are lagged by one trading row: row t holds the latest
-  observation dated <= t-1, because FRED values are published with a delay.
+* Row t is one trading day of the traded instrument (GLD, or XAUUSD daily bars
+  built from Dukascopy H1 at a fixed UTC cut hour, see goldml/dukascopy.py).
+* Everything stored in row t is known at the decision time of day t.
+* Macro series (FRED) are lagged per series (FRED_LAGS, in trading rows) to
+  respect publication delays: row t holds the latest observation dated <= t-lag.
 * Rows on/after HOLDOUT_START are hidden unless a sealed candidate unlocks them.
 """
 from __future__ import annotations
@@ -23,6 +24,8 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[1]
 SNAPSHOT_DIR = REPO / "data" / "snapshot"
+DATA_SOURCES = {"gld": SNAPSHOT_DIR, "xau": REPO / "data" / "snapshot_xau"}
+DATA_SOURCE = "gld"           # switched by the planner, journaled
 CANDIDATES_DIR = REPO / "candidates"
 HOLDOUT_LOG = REPO / "results" / "holdout_log.csv"
 
@@ -37,6 +40,10 @@ FRED_SERIES = {
     "DTWEXBGS": "usd_broad",      # broad trade-weighted USD index (starts 2006)
     "VIXCLS": "vix",
 }
+# Publication lag in trading rows. H.15 rates (DFII10, T10YIE) for day d appear
+# around 16:15 ET on d+1, after the decision time -> 2. DTWEXBGS (H.10) is released
+# weekly on Monday for the previous week -> 8. VIX close of d is known before d+1 -> 1.
+FRED_LAGS = {"real_yield_10y": 2, "breakeven_10y": 2, "usd_broad": 8, "vix": 1}
 PRICE_COLS = ["open", "high", "low", "close", "volume"]
 
 
@@ -62,14 +69,7 @@ def fetch_snapshot(out_dir: Path = SNAPSHOT_DIR) -> dict:
     px.index = pd.DatetimeIndex(px.index.date, name="date")
     px.to_csv(out_dir / "prices.csv", float_format="%.6f")
 
-    frames = []
-    for sid, col in FRED_SERIES.items():
-        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
-        raw = urllib.request.urlopen(url, timeout=60).read().decode()
-        s = pd.read_csv(io.StringIO(raw), index_col=0, parse_dates=True, na_values=".").iloc[:, 0]
-        frames.append(s.rename(col))
-    fred = pd.concat(frames, axis=1).sort_index()
-    fred.index.name = "date"
+    fred = fetch_fred()
     fred.to_csv(out_dir / "fred.csv", float_format="%.6f")
 
     manifest = {
@@ -85,17 +85,36 @@ def fetch_snapshot(out_dir: Path = SNAPSHOT_DIR) -> dict:
     return manifest
 
 
-def snapshot_hash(snap_dir: Path = SNAPSHOT_DIR) -> str:
+def fetch_fred() -> pd.DataFrame:
+    frames = []
+    for sid, col in FRED_SERIES.items():
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
+        raw = urllib.request.urlopen(url, timeout=60).read().decode()
+        s = pd.read_csv(io.StringIO(raw), index_col=0, parse_dates=True, na_values=".").iloc[:, 0]
+        frames.append(s.rename(col))
+    fred = pd.concat(frames, axis=1).sort_index()
+    fred.index.name = "date"
+    return fred
+
+
+def snapshot_hash(snap_dir: Path | None = None) -> str:
+    snap_dir = snap_dir or DATA_SOURCES[DATA_SOURCE]
     m = json.loads((snap_dir / "manifest.json").read_text())
     return hashlib.sha256(json.dumps(m["files"], sort_keys=True).encode()).hexdigest()[:12]
 
 
-def load_raw(snap_dir: Path = SNAPSHOT_DIR) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_raw(snap_dir: Path | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    snap_dir = snap_dir or DATA_SOURCES[DATA_SOURCE]
     m = json.loads((snap_dir / "manifest.json").read_text())
     for f, h in m["files"].items():
         if _sha256(snap_dir / f) != h:
             raise RuntimeError(f"snapshot file {f} does not match manifest hash")
-    px = pd.read_csv(snap_dir / "prices.csv", index_col=0, parse_dates=True)
+    if "h1.csv.gz" in m["files"]:
+        from .dukascopy import daily_from_h1
+        h1 = pd.read_csv(snap_dir / "h1.csv.gz", index_col=0, parse_dates=True)
+        px = daily_from_h1(h1)
+    else:
+        px = pd.read_csv(snap_dir / "prices.csv", index_col=0, parse_dates=True)
     fred = pd.read_csv(snap_dir / "fred.csv", index_col=0, parse_dates=True)
     return px, fred
 
@@ -131,13 +150,16 @@ def validate_prices(px: pd.DataFrame) -> list[str]:
 
 # --------------------------------------------------------------------------- panel
 
-def build_panel(px: pd.DataFrame, fred: pd.DataFrame | None, fred_lag_rows: int = 1) -> pd.DataFrame:
+def build_panel(px: pd.DataFrame, fred: pd.DataFrame | None, lags: dict | None = None) -> pd.DataFrame:
     """Join prices with as-of lagged macro columns. Drops rows with NaN OHLC."""
-    panel = px[PRICE_COLS].dropna(subset=PRICE_COLS[:4]).sort_index().copy()
+    lags = FRED_LAGS if lags is None else lags
+    extra = [c for c in px.columns if c not in PRICE_COLS and c not in FRED_SERIES.values()]
+    panel = px[PRICE_COLS + extra].dropna(subset=PRICE_COLS[:4]).sort_index().copy()
     if fred is not None and len(fred.columns):
         union = panel.index.union(fred.index)
         asof = fred.reindex(union).ffill().reindex(panel.index)   # latest obs dated <= t
-        panel = panel.join(asof.shift(fred_lag_rows))              # latest obs dated <= t-lag
+        for col in asof.columns:                                   # latest obs dated <= t-lag
+            panel[col] = asof[col].shift(lags.get(col, 1))
     return panel
 
 
@@ -154,7 +176,7 @@ def _check_candidate(candidate: str, log_path: Path, cand_dir: Path) -> None:
 
 
 def load_panel(split: str = "dev", candidate: str | None = None, *,
-               snap_dir: Path = SNAPSHOT_DIR, log_path: Path = HOLDOUT_LOG,
+               snap_dir: Path | None = None, log_path: Path = HOLDOUT_LOG,
                cand_dir: Path = CANDIDATES_DIR) -> pd.DataFrame:
     """split='dev': rows DEV_START..HOLDOUT_START (exclusive).
     split='holdout': all rows from DEV_START, only for a sealed candidate, logged, once."""

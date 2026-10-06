@@ -2,6 +2,24 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-06 — J003 Plan: switch to XAUUSD (Dukascopy), fix FRED lags
+
+- Owner wants XAU itself. Dukascopy is blocked for the planner, but the runner
+  downloads, so: `goldml/dukascopy.py` (decoder for hourly bid/ask `.bi5`
+  candles, H1 -> daily bars at a 13:00 UTC cut with a 1-hour execution delay)
+  and `prompts/R000.md` (data-only run). Decoder, weekend mapping and the
+  no-look-ahead property of the daily bars are covered by synthetic tests;
+  the price scale (1000) and field order are checked on the real data by
+  `validate_h1` (median price range, OHLC consistency).
+- Hourly data also opens intraday models later.
+- Found while doing this: a one-row FRED lag was look-ahead for two series.
+  H.15 rates for day d appear ~16:15 ET on d+1 (after the decision), and the
+  broad USD index is released weekly. Now 2 rows for DFII10/T10YIE, 8 for
+  DTWEXBGS, 1 for VIX. Fixed before any market run.
+- R001 is on hold until the R000 snapshot is reviewed; it will run on XAU.
+- Question for owner: is 21:00 Bangkok a time they can actually trade? The
+  cut hour is a parameter and can change before R001 without a new download.
+
 ## 2026-10-06 — J002 Data check: GLD vs world spot gold
 
 Owner asked whether GLD matches world spot. Compared GLD close with Alpha

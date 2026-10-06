@@ -6,20 +6,27 @@ tried, or by just holding gold?
 
 ## Instrument and data
 
-- Traded instrument: **GLD** daily OHLCV (Yahoo), 2004-11-18 onward. Chosen
+- **Planned primary (pending R000 review): XAUUSD** from the Dukascopy public
+  feed, hourly bid/ask candles (mid prices), fetched by the runner into
+  `data/snapshot_xau/`. Daily bars are built at a fixed UTC cut: decision at
+  13:00 UTC (20:00 Bangkok) using bars closed by then, fill at the open of the
+  14:00 UTC bar (21:00 Bangkok), see `goldml/dukascopy.py`. The spread at the
+  fill bar is kept (`exec_spread_bps`) to check the cost assumption.
+- Current fallback: **GLD** daily OHLCV (Yahoo), 2004-11-18 onward. Chosen
   over `GC=F` because the continuous futures series has 441 rows of
   inconsistent OHLC, zero-volume days and roll gaps; GLD had none.
   Dukascopy XAUUSD intraday is blocked from the planner's environment.
 - Macro (FRED): `DFII10` real yield, `T10YIE` breakeven, `DTWEXBGS` broad USD
-  (from 2006), `VIXCLS`. Lagged one trading row (as-of `t-1`) for publication delay.
+  (from 2006), `VIXCLS`. Lagged per series for publication delay: H.15 rates
+  2 rows, weekly-released USD index 8 rows, VIX 1 row (`FRED_LAGS`).
 - Frozen snapshot in `data/snapshot/` with SHA-256 hashes in `manifest.json`.
   `load_raw` refuses tampered files. Snapshot fetched 2026-10-06, last bar 2026-10-02.
 
 ## Timing (no look-ahead)
 
-- Row `t` features use data up to the close of `t`.
-- The position decided at close `t` is executed at the **open of `t+1`** and
-  earns `R_t = open[t+2]/open[t+1] - 1`. Trade cost is charged on the same row.
+- Row `t` features use data up to the decision time of `t` (GLD: close; XAU: 13:00 UTC cut).
+- The position decided at `t` is executed at the **`open` of `t+1`** (GLD:
+  next open; XAU: the 14:00 UTC fill) and earns `R_t = open[t+2]/open[t+1] - 1`. Trade cost is charged on the same row.
 - Labels: `fwd_h = log(open[t+1+h] / open[t+1])`.
 - Walk-forward, expanding window, retrain every 6 months. A training row `t`
   is used only if `t + 1 + h < first test row` (purge + 1 row embargo).
