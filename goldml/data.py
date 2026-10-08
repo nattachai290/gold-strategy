@@ -25,7 +25,7 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[1]
 SNAPSHOT_DIR = REPO / "data" / "snapshot"
 DATA_SOURCES = {"gld": SNAPSHOT_DIR, "xau": REPO / "data" / "snapshot_xau"}
-DATA_SOURCE = "gld"           # switched by the planner, journaled
+DATA_SOURCE = "xau"           # switched by the planner, journaled (J007)
 CANDIDATES_DIR = REPO / "candidates"
 HOLDOUT_LOG = REPO / "results" / "holdout_log.csv"
 

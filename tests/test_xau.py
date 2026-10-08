@@ -188,3 +188,35 @@ def test_cache_status_counts_complete_months(tmp_path):
         (tmp_path / name).write_bytes(b"")
     s = cache_status("2020-01", "2020-03", tmp_path)
     assert s["months_cached"] == 1 and s["months_total"] == 3 and s["first_missing"] == "2020-02"
+
+
+def test_trailing_partial_day_is_dropped():
+    h1 = make_h1("2020-01-06", days=10, seed=7)
+    h1 = h1[h1.index < pd.Timestamp("2020-01-14 20:00")]      # data ends after Tuesday's cut, before Wednesday's
+    d = daily_from_h1(h1, cut_hour=13)
+    assert d.index.max() == pd.Timestamp("2020-01-14")
+    assert d.loc["2020-01-14", "close"] == pytest.approx(h1.loc["2020-01-14 12:00", "close"])
+
+
+def test_load_panel_from_xau_snapshot(tmp_path, monkeypatch):
+    import goldml.dukascopy as dk
+    from goldml.data import load_panel
+
+    h1 = make_h1("2020-01-01", days=62, seed=8)
+
+    def fake_get(url, tries=12):
+        parts = url.split("/")
+        ms = pd.Timestamp(year=int(parts[-3]), month=int(parts[-2]) + 1, day=1)
+        sl = h1[(h1.index >= ms) & (h1.index < ms + pd.offsets.MonthBegin(1))]
+        bump = 0.15 if "ASK" in url else -0.15
+        return dk.encode_candles(sl[["open", "high", "low", "close"]].add(bump).assign(volume=sl["volume"]), ms)
+
+    fred = pd.DataFrame({"vix": np.arange(80.0)}, index=pd.bdate_range("2019-12-01", periods=80, name="date"))
+    monkeypatch.setattr(dk, "_get", fake_get)
+    monkeypatch.setattr(dk, "fetch_fred", lambda: fred)
+    monkeypatch.setattr(dk.time, "sleep", lambda s: None)
+    dk.fetch_xau_snapshot("2020-01", "2020-02", tmp_path)
+    p = load_panel("dev", snap_dir=tmp_path, log_path=tmp_path / "log.csv", cand_dir=tmp_path)
+    assert {"open", "high", "low", "close", "volume", "exec_spread_bps", "vix"} <= set(p.columns)
+    assert set(p.index.dayofweek) <= {0, 1, 2, 3, 4} and p.index.is_monotonic_increasing
+    assert p["exec_spread_bps"].median() == pytest.approx(0.3 / 1500 * 1e4, rel=0.2)

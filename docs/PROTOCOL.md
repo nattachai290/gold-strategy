@@ -6,7 +6,7 @@ tried, or by just holding gold?
 
 ## Instrument and data
 
-- **Planned primary (pending R000 review): XAUUSD** from the Dukascopy public
+- **Primary (since J007): XAUUSD** from the Dukascopy public
   feed, hourly bid/ask candles (mid prices), fetched by the runner into
   `data/snapshot_xau/`. Daily bars are built at a fixed UTC cut: decision at
   13:00 UTC (20:00 Bangkok) using bars closed by then, fill at the open of the
@@ -18,7 +18,9 @@ tried, or by just holding gold?
   `python -m goldml.dukascopy restore`, which re-downloads and must reproduce
   the hashes exactly; a mismatch (e.g. a vendor revision) stops the run and
   becomes a planned, journaled new snapshot.
-- Current fallback: **GLD** daily OHLCV (Yahoo), 2004-11-18 onward. Chosen
+  Snapshot: 141,968 H1 bars, 2003-05-05 .. 2026-09-30, no missing months;
+  manifest hashes reproduced by `restore`.
+- Fallback: **GLD** daily OHLCV (Yahoo), 2004-11-18 onward. Chosen
   over `GC=F` because the continuous futures series has 441 rows of
   inconsistent OHLC, zero-volume days and roll gaps; GLD had none.
   Dukascopy XAUUSD intraday is blocked from the planner's environment.
@@ -45,7 +47,7 @@ tried, or by just holding gold?
 |---|---|---|
 | warm-up / first training | 2005-01-03 .. 2009-12-31 | training only |
 | development OOS | 2010-01-01 .. 2023-12-31 | walk-forward results, gates |
-| **holdout** | 2024-01-01 .. end of snapshot | one shot per sealed candidate |
+| **holdout** | 2024-01-01 .. 2026-09-30 (end of XAU snapshot) | one shot per sealed candidate |
 
 ## Trading constraint and costs
 
@@ -61,8 +63,13 @@ whether a model can **time** gold better than simply holding it.
 
 Venue: MTS Gold via Dime!, spot in USD. Observed quote 2026-10-06: sell
 4,130.48 / buy 4,130.83 USD/oz = $0.35 spread = 0.85 bps round trip. The
-primary 2 bps one-way (~5x observed) covers wider off-hours spreads, slippage and the gap
-between the GLD open used in the backtest and the owner's real fill.
+primary 2 bps one-way (~5x observed) covers wider off-hours spreads and slippage.
+Cross-check from Dukascopy (R000): full bid-ask spread at the 14:00 UTC fill
+bar, median by year, was 4.0 bps in 2010 falling to ~1.8-2.6 bps in 2011-2023,
+i.e. a half-spread of ~1-2 bps one-way. 2 bps one-way is therefore at or above
+the feed's own cost through the whole dev period; the 2x stress (4 bps) is
+conservative. Spreads widen sharply at 21-23 UTC (rollover), which the 14:00
+fill avoids.
 Stress test (G4): primary costs x2.
 
 ## Gates (development OOS, primary profile)

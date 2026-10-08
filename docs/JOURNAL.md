@@ -2,6 +2,36 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-08 — J007 R000 done: XAU snapshot accepted, data source switched
+
+**Result.** Attempt 3 finished in one detached run of 6 h 16 min: 281/281
+months, 141,968 H1 bars (2003-05-05 .. 2026-09-30), 0 empty months, 278
+retries (503 x121, timeout x117, reset x39), never exhausted. `restore`
+reproduced the hashes. Manifest issues: 2 hourly moves > 5%, 2008-09-18 19:00
+(Lehman week) and 2026-01-29 15:00 (the same late-January 2026 gold crash
+already seen in GLD). Both are real events: kept, not cleaned.
+
+**Data report (counts and spreads only).** ~5,900-6,300 H1 bars and 260-262
+daily bars per year. Full bid-ask spread at the 14:00 UTC fill bar, median:
+11.8 bps in 2003 -> 4.0 in 2010 -> 1.8-2.6 in 2011-2023 -> 1.5-1.9 in
+2024-2026. By hour, spreads are ~2.3 bps all day and 4.5-6.2 bps at 21-23 UTC
+(rollover).
+
+**Learned.** The 2 bps one-way primary cost sits at or above the feed's own
+half-spread for the whole dev period (2010: ~2.0, later ~1.0); the 2x stress
+is conservative. 2005-2009 spreads were much wider, but those years are
+training only. The 14:00 UTC fill is a normal-spread hour.
+
+**Changed (planner).** `DATA_SOURCE = "xau"`. Daily bars drop a trailing day
+whose cut lies after the last bar (the snapshot ends 2026-09-30 23:00, so the
+2026-10-01 row was a partial day; holdout end only). Holdout = 2024-01-01 ..
+2026-09-30. 32 synthetic tests.
+
+**Next.** R001 (4 trials, `experiments/e001_first_models.py`) on XAU, same
+machine as R000. Possible later refinement: charge each day's actual
+half-spread from `exec_spread_bps` instead of a flat 2 bps (a protocol change,
+to be decided before it is used, not after seeing results).
+
 ## 2026-10-08 — J006 R000 attempt 2 failed (throttling); 130/281 months cached
 
 **Result.** Six fetch runs over 3 days on the runner's Windows host. The

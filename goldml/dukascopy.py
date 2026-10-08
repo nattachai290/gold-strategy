@@ -241,6 +241,8 @@ def daily_from_h1(h1: pd.DataFrame, cut_hour: int = CUT_HOUR_UTC, exec_delay_h: 
         "n_bars": g.size(),
     }).dropna(subset=["open", "close"])
     out = out[out["n_bars"] >= 6]                         # drop Sunday-evening stubs etc.
+    # drop a trailing day whose cut lies after the last bar (its close is not the cut price)
+    out = out[out.index + pd.Timedelta(hours=cut_hour) <= h1.index.max() + pd.Timedelta(hours=1)]
     out.index = pd.DatetimeIndex(out.index.date, name="date")
     out["high"] = out[["high", "open", "close"]].max(axis=1)
     out["low"] = out[["low", "open", "close"]].min(axis=1)
