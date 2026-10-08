@@ -1,0 +1,22 @@
+{
+  "fetched_utc": "2026-10-08T10:08:15+00:00",
+  "source": "dukascopy XAUUSD H1 bid/ask, mid prices",
+  "price_scale": 1000.0,
+  "months": [
+    "2003-05",
+    "2026-09"
+  ],
+  "fred_end": "2026-09-30",
+  "h1_rows": 141968,
+  "h1_range": [
+    "2003-05-05 00:00:00",
+    "2026-09-30 23:00:00"
+  ],
+  "files": {
+    "h1.csv.gz": "2fd49bfd8ed2451366e879232e7510a789b7fb678f195e3ba7b44945a44b70d9",
+    "fred.csv": "0ad924dc16b1fc23c8230adbd4d4d4a3b3d3bf250aa28978d40c0b8bfa51fe7b"
+  },
+  "issues": [
+    "2 hourly moves > 5%: [Timestamp('2008-09-18 19:00:00'), Timestamp('2026-01-29 15:00:00')]"
+  ]
+}
