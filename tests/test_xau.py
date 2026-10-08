@@ -179,3 +179,12 @@ def test_snapshot_csv_uses_lf_line_endings(tmp_path, monkeypatch):
     dk._write_files(tmp_path, "2020-01", "2020-01", "2020-01-31")
     assert b"\r\n" not in gzip.decompress((tmp_path / "h1.csv.gz").read_bytes())
     assert b"\r\n" not in (tmp_path / "fred.csv").read_bytes()
+
+
+def test_cache_status_counts_complete_months(tmp_path):
+    from goldml.dukascopy import cache_status
+
+    for name in ("2020-01_BID.bi5", "2020-01_ASK.bi5", "2020-02_BID.bi5"):
+        (tmp_path / name).write_bytes(b"")
+    s = cache_status("2020-01", "2020-03", tmp_path)
+    assert s["months_cached"] == 1 and s["months_total"] == 3 and s["first_missing"] == "2020-02"

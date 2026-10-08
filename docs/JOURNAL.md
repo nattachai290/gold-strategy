@@ -2,6 +2,29 @@
 
 Newest entry first. Each run: plan → result → what was learned → next step.
 
+## 2026-10-08 — J006 R000 attempt 2 failed (throttling); 130/281 months cached
+
+**Result.** Six fetch runs over 3 days on the runner's Windows host. The
+browser User-Agent removed the 429s, but the feed still throttles: final run
+had 108 retries (503 x49, connection timeout x46, reset x13). Three runs died
+after 8 tries, which used up the 3-rerun budget. 130 months (2003-05 ..
+2014-02) are in the runner's local `raw/` cache. Throughput swings from 2 to
+76 months per run, by hour. The runner also found that its harness kills
+background shells after ~30-40 min, and switched to detached processes.
+
+**Learned.** Throttle windows last tens of minutes; a 5-minute cap with 8
+tries cannot wait them out. A fixed rerun count is the wrong stop rule when
+every run makes progress.
+
+**Changed (planner).** 12 tries per file, waits up to 15 min, 3 s between
+requests; `python -m goldml.dukascopy status` reports cached months. New stop
+rule: keep resuming while runs add months; stop only after 2 runs in a row add
+nothing, or after 3 days. 30 synthetic tests.
+
+**Next.** R000 attempt 3 on the same machine (keeps the cache). If the feed
+stays this slow, fallback options: fetch from another network, or start the
+XAU work on GLD and switch when the snapshot lands.
+
 ## 2026-10-06 — J005 R000 attempt 1 failed (HTTP 429); fetch hardened
 
 **Result.** Runner (Windows 11, Python 3.13) got HTTP 429 on the 2nd file.

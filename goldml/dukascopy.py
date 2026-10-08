@@ -81,11 +81,13 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
                          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
            "Accept": "*/*"}
 RETRY_CODES = {429, 500, 502, 503, 504}
-REQUEST_PAUSE = 1.0           # seconds between requests
+# R000 attempt 2: throttle windows (503, timeouts, resets) last tens of minutes,
+# so be patient: up to 12 tries per file with waits growing to 15 minutes.
+REQUEST_PAUSE = 3.0           # seconds between requests
 
 
-def _get(url: str, tries: int = 8, base_wait: float = 5.0, max_wait: float = 300.0) -> bytes:
-    """GET with browser UA; on 429/5xx/network errors back off (Retry-After or 5s*2^k, cap 5 min)."""
+def _get(url: str, tries: int = 12, base_wait: float = 5.0, max_wait: float = 900.0) -> bytes:
+    """GET with browser UA; on 429/5xx/network errors back off (Retry-After or 5s*2^k, cap 15 min)."""
     err: Exception | None = None
     for k in range(tries):
         wait = min(max_wait, base_wait * 2 ** k) * (1 + 0.25 * random.random())
@@ -121,6 +123,16 @@ def _get_cached(url: str, cache: Path | None) -> bytes:
         tmp.replace(cache)
     time.sleep(REQUEST_PAUSE)
     return raw
+
+
+def cache_status(start: str, end: str, cache_dir: Path) -> dict:
+    """Which months are fully cached (BID and ASK) - used to measure fetch progress."""
+    months = pd.period_range(pd.Period(start, "M"), pd.Period(end, "M"), freq="M")
+    done = [p for p in months
+            if all((cache_dir / f"{p.year}-{p.month:02d}_{s}.bi5").exists() for s in ("BID", "ASK"))]
+    missing = [str(p) for p in months if p not in set(done)]
+    return {"months_total": len(months), "months_cached": len(done),
+            "first_missing": missing[0] if missing else None, "missing": missing}
 
 
 def fetch_h1(start: str, end: str, cache_dir: Path | None = None) -> pd.DataFrame:
@@ -275,8 +287,15 @@ def main(argv=None) -> int:
     f.add_argument("--end", required=True, help="last COMPLETE month, YYYY-MM")
     sub.add_parser("restore")
     sub.add_parser("report")
+    st = sub.add_parser("status", help="how many months are cached (progress of an interrupted fetch)")
+    st.add_argument("--start", default="2003-05")
+    st.add_argument("--end", default="2026-09")
     a = ap.parse_args(argv)
     _utf8_stdout()
+    if a.cmd == "status":
+        s = cache_status(a.start, a.end, XAU_SNAPSHOT_DIR / "raw")
+        print(f"cached {s['months_cached']}/{s['months_total']} months; first missing: {s['first_missing']}")
+        return 0
     if a.cmd == "fetch":
         m = fetch_xau_snapshot(a.start, a.end)
         print(json.dumps(m, indent=2))
